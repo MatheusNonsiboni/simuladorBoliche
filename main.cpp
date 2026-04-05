@@ -23,7 +23,7 @@ float posicaoBolaZ = 10.0f;  // Posição Z da bola
 float rotacaoBola = 0.0f;    // Rotação da bola enquanto rola
 
 // braço limpador (sweeper)
-float anguloLimpador = 0.0f; // Rotação do braço
+float anguloLimpador = 90.0f; // Rotação do braço (90 = erguido/repouso, 0 = abaixado)
 bool limpando = false;       // Se está animando
 int faseLimpador = 0;        // Fases da animação (0 = idle, 1 = descendo, 2 = limpando, 3 = subindo)
 float tempoLimpador = 0.0f;  // Timer auxiliar para fases do sweeper
@@ -68,12 +68,13 @@ void desenharPino(const Pino& pino) {
     glPushMatrix();
     glTranslatef(pino.x, pino.y, pino.z);
 
-    // Se derrubado, aplica a rotação para simular queda
+    // Se derrubado, rotaciona em torno da base para simular queda
     if (pino.derrubado) {
-        glTranslatef(0.0f, -0.05f, 0.0f); // ponto de rotação levemente mais baixo
         glRotatef(pino.anguloAtual, 1.0f, 0.0f, 0.0f);
-        glTranslatef(0.0f, 0.05f, 0.0f);
     }
+
+    // Rotaciona -90 graus no eixo X para o cilindro ficar de pe (eixo Z -> eixo Y)
+    glRotatef(-90.0f, 1.0f, 0.0f, 0.0f);
 
     // Material do pino (branco, especular moderado)
     GLfloat pino_ambient[] = {0.12f, 0.12f, 0.12f, 1.0f};
@@ -189,27 +190,27 @@ void desenharPista() {
 // Inicializa as posiçôes dos 10 pinos
 void inicializarPinos() {
     float espacamento = 0.5f;
-    float startZ = -9.0f;
+    float startZ = -9.0f; // fundo da pista (fileira de 4 fica aqui)
     float r = espacamento * 0.866f;
     int count = 0;
 
-    // Linha 1: 1 pino
-    pinos[count++] = {0.0f, 0.3f, startZ, false, 90.0f, 0.0f};
-
-    // Linha 2: 2 pinos
-    pinos[count++] = {-espacamento / 2.0f, 0.3f, startZ + r, false, 90.0f, 0.0f};
-    pinos[count++] = {espacamento / 2.0f, 0.3f, startZ + r, false, 90.0f, 0.0f};
+    // Linha 4 (fundo): 4 pinos - mais longe do jogador
+    pinos[count++] = {-1.5f * espacamento, 0.3f, startZ, false, 90.0f, 0.0f};
+    pinos[count++] = {-0.5f * espacamento, 0.3f, startZ, false, 90.0f, 0.0f};
+    pinos[count++] = {0.5f * espacamento, 0.3f, startZ, false, 90.0f, 0.0f};
+    pinos[count++] = {1.5f * espacamento, 0.3f, startZ, false, 90.0f, 0.0f};
 
     // Linha 3: 3 pinos
-    pinos[count++] = {-espacamento, 0.3f, startZ + 2 * r, false, 90.0f, 0.0f};
-    pinos[count++] = {0.0f, 0.3f, startZ + 2 * r, false, 90.0f, 0.0f};
-    pinos[count++] = {espacamento, 0.3f, startZ + 2 * r, false, 90.0f, 0.0f};
+    pinos[count++] = {-espacamento, 0.3f, startZ + r, false, 90.0f, 0.0f};
+    pinos[count++] = {0.0f, 0.3f, startZ + r, false, 90.0f, 0.0f};
+    pinos[count++] = {espacamento, 0.3f, startZ + r, false, 90.0f, 0.0f};
 
-    // Linha 4: 4 pinos
-    pinos[count++] = {-1.5f * espacamento, 0.3f, startZ + 3 * r, false, 90.0f, 0.0f};
-    pinos[count++] = {-0.5f * espacamento, 0.3f, startZ + 3 * r, false, 90.0f, 0.0f};
-    pinos[count++] = {0.5f * espacamento, 0.3f, startZ + 3 * r, false, 90.0f, 0.0f};
-    pinos[count++] = {1.5f * espacamento, 0.3f, startZ + 3 * r, false, 90.0f, 0.0f};
+    // Linha 2: 2 pinos
+    pinos[count++] = {-espacamento / 2.0f, 0.3f, startZ + 2 * r, false, 90.0f, 0.0f};
+    pinos[count++] = {espacamento / 2.0f, 0.3f, startZ + 2 * r, false, 90.0f, 0.0f};
+
+    // Linha 1 (frente): 1 pino - mais perto do jogador
+    pinos[count++] = {0.0f, 0.3f, startZ + 3 * r, false, 90.0f, 0.0f};
 
     // Ajuste e zeragem de parametros
     for (int i = 0; i < NUM_PINOS; ++i) {
@@ -410,9 +411,9 @@ void atualizarLogicaJogo(float deltaTime) {
     if (limpando) {
         const float velocidade = 120.0f;
         if (faseLimpador == 1) { // descendo
-            anguloLimpador += velocidade * deltaTime;
-            if (anguloLimpador >= 90.0f) {
-                anguloLimpador = 90.0f;
+            anguloLimpador -= velocidade * deltaTime;
+            if (anguloLimpador <= 0.0f) {
+                anguloLimpador = 0.0f;
                 faseLimpador = 2;
                 tempoLimpador = 0.0f;
             }
@@ -427,9 +428,9 @@ void atualizarLogicaJogo(float deltaTime) {
             tempoLimpador += deltaTime;
             if (tempoLimpador >= 1.0f) faseLimpador = 3;
         } else if (faseLimpador == 3) { // subindo
-            anguloLimpador -= velocidade * deltaTime;
-            if (anguloLimpador <= 0.0f) {
-                anguloLimpador = 0.0f;
+            anguloLimpador += velocidade * deltaTime;
+            if (anguloLimpador >= 90.0f) {
+                anguloLimpador = 90.0f;
                 limpando = false;
                 faseLimpador = 0;
                 tempoLimpador = 0.0f;
@@ -456,12 +457,12 @@ void reiniciarJogo() {
     rotacaoBola = 0.0f;
     jogoLancado = false;
 
-    anguloLimpador = 0.0f;
+    anguloLimpador = 90.0f;
     limpando = false;
     faseLimpador = 0;
     tempoLimpador = 0.0f;
 
-    std::cout << "\nJogo reiniciado. Posicione a bola e pressione ESPAÇO para lançar." << std::endl;
+    std::cout << "\nJogo reiniciado. Posicione a bola e pressione ESPACO para lancar." << std::endl;
 }
 
 // Teclas normais
@@ -563,14 +564,13 @@ int main(int argc, char** argv) {
 
     // Documentação dos controles
     std::cout << "Controles: " << std::endl;
-    std::cout << "Setas Esquerda/Direita: mover a bola lateralmente (pro-lancamento)." << std::endl;
-    std::cout << "Setas Cima/Baixo: ajustar velocidade (pro-lancamento)." << std::endl;
-    std::cout << "ESPAÇO: lançar a bola." << std::endl;
+    std::cout << "Setas Esquerda/Direita: mover a bola lateralmente (pre-lancamento)." << std::endl;
+    std::cout << "Setas Cima/Baixo: ajustar velocidade (pre-lancamento)." << std::endl;
+    std::cout << "ESPACO: lancar a bola." << std::endl;
     std::cout << "R: ativar limpador (varre os pinos e reinicia o jogo)." << std::endl;
     std::cout << "ESC: sair." << std::endl;
 
     glutMainLoop();
     return 0;
 }
-
 
